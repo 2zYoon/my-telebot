@@ -63,6 +63,8 @@ def check_admin(update, context):
 def get_now_yymmdd():
     return int(datetime.datetime.now().strftime("%y%m%d"))
 
+def get_now_hhmm():
+    return int(datetime.datetime.now().strftime("%H%M"))
 
 ###########################
 # MULTITHREADED FUNCTIONS #
@@ -76,7 +78,26 @@ def worker_exit():
 
 # worker for polling
 def worker_poll():
-    
+    # alarm
+    cursor.execute("select * from alarm where weekday = %d and last != '%s'" % \
+        (datetime.datetime.today().weekday(),
+         datetime.datetime.now().strftime("%Y-%m-%d"))
+    )
+
+    items = cursor.fetchall()
+
+    for i in items:
+        if i[1] == get_now_hhmm():
+            cursor.execute("update alarm set last = '%s' where name = '%s' and weekday = %d" % \
+                (datetime.datetime.now().strftime("%Y-%m-%d"),
+                 i[0], 
+                 datetime.datetime.today().weekday())
+            )
+
+            db.commit()
+
+            msg = "[알람] %s:\n%s" % (i[0], i[3])
+            bot.core.send_message(chat_id=bot.chatid, text=msg)
 
     th = threading.Timer(PERIOD_POLL_SEC, worker_poll)
     th.daemon = True
@@ -253,7 +274,7 @@ def cmd_alarm(update, context):
         
         try:
             for w in weekdays:
-                cursor.execute("insert into alarm values ('%s', %d, %d, '%s')" % (name, hhmm, w, desc))
+                cursor.execute("insert into alarm values ('%s', %d, %d, '%s', '0001-01-01')" % (name, hhmm, w, desc))
             db.commit()
         except:
             db.rollback()
