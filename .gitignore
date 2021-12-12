@@ -1,3 +1,9 @@
+# CUSTOM
+config.yaml
+backup.zip
+private/
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
