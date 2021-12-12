@@ -96,7 +96,7 @@ def worker_poll():
 
             db.commit()
 
-            msg = "[알람] %s:\n%s" % (i[0], i[3])
+            msg = "[알람] %s\n%s" % (i[0], i[3])
             bot.core.send_message(chat_id=bot.chatid, text=msg)
 
     th = threading.Timer(PERIOD_POLL_SEC, worker_poll)
