@@ -85,8 +85,6 @@ def worker_poll():
     )
 
     items = cursor.fetchall()
-    print(items)
-    print(datetime.datetime.today().weekday())
 
     for i in items:
         if i[1] == get_now_hhmm():
