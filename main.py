@@ -85,6 +85,8 @@ def worker_poll():
     )
 
     items = cursor.fetchall()
+    print(items)
+    print(datetime.datetime.today().weekday())
 
     for i in items:
         if i[1] == get_now_hhmm():
@@ -246,20 +248,20 @@ def cmd_alarm(update, context):
         if context.args[3] == "all":
             weekdays = [0, 1, 2, 3, 4, 5, 6]
         else:
-            if "일" in context.args[3]:
-                weekdays.append(0) 
             if "월" in context.args[3]:
-                weekdays.append(1)
+                weekdays.append(0)
             if "화" in context.args[3]:
-                weekdays.append(2)
+                weekdays.append(1)
             if "수" in context.args[3]:
-                weekdays.append(3)
+                weekdays.append(2)
             if "목" in context.args[3]:
-                weekdays.append(4)
+                weekdays.append(3)
             if "금" in context.args[3]:
-                weekdays.append(5)
+                weekdays.append(4)
             if "토" in context.args[3]:
-                weekdays.append(6)
+                weekdays.append(5)
+            if "일" in context.args[3]:
+                weekdays.append(6) 
 
         if len(context.args) < 5:
             desc = ""
