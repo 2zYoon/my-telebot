@@ -134,8 +134,6 @@ def cmd_help(update, context):
 > 챗봇의 데이터를 백업하여 전송합니다. 
 /diary <내용>
 > 작성한 내용을 다이어리에 저장합니다.
-/eat <지역> <장소> <음식> <점수> [코멘트]
-> 먹은 음식을 DB에 기록합니다.
 /alarm <add|show|remove>
 > 알람을 등록, 확인, 혹은 제거합니다.
 '''
@@ -193,6 +191,18 @@ def cmd_diary(update, context):
     context.bot.send_message(chat_id=update.effective_chat.id, 
                              text="다이어리 작성이 완료되었습니다.")
 
+'''
+# NOTE: deprecated
+# scheme:
+#   id      (bigint, auto_increment)
+#   region  (varchar(64))
+#   place   (varchar(64))
+#   food    (varchar(128))
+#   date    (datetime(6))
+#   score   (int)
+#   review  (varchar(512))
+
+
 def cmd_eat(update, context):
     if check_admin(update, context):
         return
@@ -225,6 +235,7 @@ def cmd_eat(update, context):
     context.bot.send_message(chat_id=update.effective_chat.id, 
                             text="식사 기록이 완료되었습니다.")
 
+'''
 
 def cmd_alarm(update, context):
     if check_admin(update, context):
@@ -312,7 +323,7 @@ def cmd_alarm(update, context):
                 msg += ",".join(tmp_for_weekday)
                 msg += "요일"
 
-            msg += " %s시 %s분\n" % (decomp_k[1][0:2], decomp_k[1][2:])
+            msg += " %s시 %s분\n" % (decomp_k[1].zfill(4)[0:2], decomp_k[1].zfill(4)[2:])
         
         context.bot.send_message(chat_id=update.effective_chat.id, 
                                  text=msg)
@@ -374,12 +385,12 @@ def init():
                   config['TELEBOT']['ADMIN_CHATID'])
     
     # commands
-    bot.add_handler('test', cmd_test)
+    #bot.add_handler('test', cmd_test)  #NOTE: not needed
     bot.add_handler('exit', cmd_exit)
     bot.add_handler('help', cmd_help)
     bot.add_handler('backup', cmd_backup)
     bot.add_handler('diary', cmd_diary)
-    bot.add_handler('eat', cmd_eat)
+    #bot.add_handler('eat', cmd_eat) # NOTE: deprecated
     bot.add_handler('alarm', cmd_alarm)
 
 
