@@ -319,7 +319,7 @@ def cmd_alarm(update, context):
                 msg += "매주 "
                 tmp_for_weekday = []
                 for i in sorted(v):
-                    tmp_for_weekday.append(["일", "월", "화", "수", "목", "금", "토"][i])
+                    tmp_for_weekday.append(["월", "화", "수", "목", "금", "토", "일"][i])
                 msg += ",".join(tmp_for_weekday)
                 msg += "요일"
 
