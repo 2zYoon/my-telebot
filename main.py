@@ -309,7 +309,9 @@ def cmd_todo(update, context):
             db.rollback()
             context.bot.send_message(chat_id=update.effective_chat.id, 
                                      text="TODO 리스트 아이템 삭제에 실패했습니다. 변경 사항을 롤백합니다.")
-
+    else:
+        context.bot.send_message(chat_id=update.effective_chat.id, 
+                                 text="/todo <add|show|remove>\n> TODO 리스트를 등록, 확인, 혹은 제거합니다.")
 
 
 
