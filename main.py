@@ -134,6 +134,8 @@ def cmd_help(update, context):
 > 챗봇의 데이터를 백업하여 전송합니다. 
 /diary <내용>
 > 작성한 내용을 다이어리에 저장합니다.
+/todo <add|show|remove>
+> TODO 리스트를 등록, 확인, 혹은 제거합니다.
 /alarm <add|show|remove>
 > 알람을 등록, 확인, 혹은 제거합니다.
 '''
@@ -237,6 +239,80 @@ def cmd_eat(update, context):
 
 '''
 
+def cmd_todo(update, context):
+    if check_admin(update, context):
+        return
+
+    if len(context.args) == 0:
+        context.bot.send_message(chat_id=update.effective_chat.id, 
+                                 text="/todo <add|show|remove>\n> TODO 리스트를 등록, 확인, 혹은 제거합니다.")
+        return
+    
+    if context.args[0] == "add":
+        if len(context.args) < 2:
+            context.bot.send_message(chat_id=update.effective_chat.id, 
+                                     text="/todo add <내용>")
+            return
+
+        content = ' '.join(context.args[1:])
+        try:
+            cursor.execute("INSERT INTO `todolist` (`id`, `todo`) VALUES (NULL, '{}')".format(content))
+            db.commit()
+            context.bot.send_message(chat_id=update.effective_chat.id, 
+                                    text="TODO 리스트 등록이 완료되었습니다.")  
+        except:
+            db.rollback()
+            context.bot.send_message(chat_id=update.effective_chat.id, 
+                                    text="TODO 리스트 등록에 실패했습니다. 변경 사항을 롤백합니다.")  
+            return
+
+    elif context.args[0] == "show":
+        cursor.execute("select * from todolist")
+        items = cursor.fetchall()
+
+        msg = "등록된 TODO 리스트 (총 {} 개)".format(len(items))
+        for i in items:
+            msg += "\n[{}] {}".format(str(i[0]), i[1])
+        
+        if len(items) == 0:
+            context.bot.send_message(chat_id=update.effective_chat.id, 
+                                    text="현재 TODO 리스트에 아이템이 없습니다.")
+            return
+            
+
+        context.bot.send_message(chat_id=update.effective_chat.id, 
+                                text=msg)
+
+    elif context.args[0] == "remove":
+        if len(context.args) < 2:
+            context.bot.send_message(chat_id=update.effective_chat.id, 
+                                     text="/todo remove [id]")
+            return
+        
+        if not context.args[1].isdigit():
+            context.bot.send_message(chat_id=update.effective_chat.id, 
+                                     text="유효하지 않은 ID입니다.")
+            return
+
+        cursor.execute("select count(*) from todolist where id = {}".format(context.args[1]))
+        if cursor.fetchall()[0][0] == 0:
+            context.bot.send_message(chat_id=update.effective_chat.id, 
+                                     text="존재하지 않는 ID입니다.")
+            return
+        
+        try:
+            cursor.execute("delete from todolist where id = {}".format(context.args[1]))
+            db.commit()
+            context.bot.send_message(chat_id=update.effective_chat.id, 
+                                     text="TODO 리스트 아이템({})을 삭제했습니다.".format(context.args[1]))
+        except:
+            db.rollback()
+            context.bot.send_message(chat_id=update.effective_chat.id, 
+                                     text="TODO 리스트 아이템 삭제에 실패했습니다. 변경 사항을 롤백합니다.")
+
+
+
+
 def cmd_alarm(update, context):
     if check_admin(update, context):
         return
@@ -250,6 +326,7 @@ def cmd_alarm(update, context):
         if len(context.args) < 4:
             context.bot.send_message(chat_id=update.effective_chat.id, 
                                      text="/alarm add <이름> <HHMM> <요일|all> [설명]")
+            return
 
         name = context.args[1]
         hhmm = int(context.args[2])
@@ -290,10 +367,11 @@ def cmd_alarm(update, context):
         except:
             db.rollback()
             context.bot.send_message(chat_id=update.effective_chat.id, 
-                                    text="알람 추가에 실패했습니다. 변경 사항을 롤백합니다.")  
-        
+                                    text="알람 등록에 실패했습니다. 변경 사항을 롤백합니다.")  
+            return
+
         context.bot.send_message(chat_id=update.effective_chat.id, 
-                                    text="알람이 성공적으로 추가되었습니다.")                            
+                                    text="알람 등록이 완료되었습니다.")                            
         
     elif context.args[0] == "show":
         items_map = dict()
@@ -325,6 +403,11 @@ def cmd_alarm(update, context):
 
             msg += " %s시 %s분\n" % (decomp_k[1].zfill(4)[0:2], decomp_k[1].zfill(4)[2:])
         
+        if len(items) == 0:
+            context.bot.send_message(chat_id=update.effective_chat.id, 
+                                    text="현재 등록된 알람이 없습니다.")
+            return
+
         context.bot.send_message(chat_id=update.effective_chat.id, 
                                  text=msg)
 
@@ -332,7 +415,8 @@ def cmd_alarm(update, context):
         if len(context.args) < 2:
             context.bot.send_message(chat_id=update.effective_chat.id, 
                                      text="/alarm remove <이름>")
-        
+            return
+
         name = context.args[1]
         cursor.execute("select count(*) from alarm where name = '%s'" % name)
         if cursor.fetchall()[0][0] == 0:
@@ -390,6 +474,7 @@ def init():
     bot.add_handler('help', cmd_help)
     bot.add_handler('backup', cmd_backup)
     bot.add_handler('diary', cmd_diary)
+    bot.add_handler('todo', cmd_todo)
     #bot.add_handler('eat', cmd_eat) # NOTE: deprecated
     bot.add_handler('alarm', cmd_alarm)
 
