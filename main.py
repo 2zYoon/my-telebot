@@ -138,6 +138,12 @@ def cmd_help(update, context):
 > TODO 리스트를 등록, 확인, 혹은 제거합니다.
 /alarm <add|show|remove>
 > 알람을 등록, 확인, 혹은 제거합니다.
+/eat
+> 음식에 대한 리뷰를 기록합니다.
+/eatmeta
+> 음식 리뷰 관련 정보를 확인합니다.
+/eatshow
+> 특정 음식 리뷰를 출력합니다.
 '''
     context.bot.send_message(chat_id=update.effective_chat.id,
                              text=help_msg)
@@ -193,38 +199,63 @@ def cmd_diary(update, context):
     context.bot.send_message(chat_id=update.effective_chat.id, 
                              text="다이어리 작성이 완료되었습니다.")
 
-'''
-# NOTE: deprecated
-# scheme:
-#   id      (bigint, auto_increment)
-#   region  (varchar(64))
-#   place   (varchar(64))
-#   food    (varchar(128))
-#   date    (datetime(6))
-#   score   (int)
-#   review  (varchar(512))
-
 
 def cmd_eat(update, context):
     if check_admin(update, context):
         return
     
-    if len(context.args) < 4:
+    if len(context.args) < 5:
         context.bot.send_message(chat_id=update.effective_chat.id, 
-                                 text="/eat <지역> <장소> <음식> <점수> [코멘트]\n> 먹은 음식을 DB에 기록합니다.")
+                                 text="/eat <카테고리> <1차 타입> <2차 타입> <이름> <점수> <코멘트>\n> 먹은 음식을 DB에 기록합니다.\n 타입은 공란일 경우 \".\"으로 표기합니다.")
         return
-    if len(context.args) >= 5:
-        comment = ' '.join(context.args[4:])
+
+    if len(context.args) >= 6:
+        comment = ' '.join(context.args[5:])
     else:
         comment = ""
 
-    query = "insert into eat values (NULL, '%s', '%s', '%s', '%s', %d, '%s')" % \
-        (context.args[0],
+    if not context.args[4].isdigit():
+        context.bot.send_message(chat_id=update.effective_chat.id, 
+                                text="/eat <카테고리> <1차 타입> <2차 타입> <이름> <점수> <코멘트>\n>\
+                                 먹은 음식을 DB에 기록합니다.\n\
+                                 - 미리 등록된 카테고리 및 1차 타입만 사용 가능합니다.\
+                                 - 2차 타입은 공란일 경우 \"X\"로 표기합니다.\
+                                 - 이름에 띄어쓰기가 필요할 경우 \".\"을 사용합니다.")
+        return
+
+
+    cursor.execute("SELECT count(*) FROM eat_meta WHERE cat = '{}'".format(context.args[0]))
+    if cursor.fetchall()[0][0] == 0:
+        context.bot.send_message(chat_id=update.effective_chat.id, 
+            text="등록되지 않은 카테고리입니다. /eatmeta에서 카테고리 정보를 확인해주세요.")
+        return
+
+    cursor.execute("SELECT count(*) FROM eat_meta WHERE type = '{}'".format(context.args[1]))
+    if cursor.fetchall()[0][0] == 0:
+        context.bot.send_message(chat_id=update.effective_chat.id, 
+            text="등록되지 않은 1차 타입입니다. /eatmeta에서 타입 정보를 확인해주세요.")
+        return
+
+
+    if context.args[2].lower() == "x":
+        pass
+    else:
+        cursor.execute("SELECT count(*) FROM eat_meta WHERE subtype = '{}'".format(context.args[2]))
+        if cursor.fetchall()[0][0] == 0:
+            cursor.execute("INSERT INTO eat_meta VALUES (NULL, '{}', '{}', '{}', NULL)".format(context.args[0], context.args[1], context.args[2]))
+            db.commit()
+            context.bot.send_message(chat_id=update.effective_chat.id, 
+                                text="새로운 2차 타입의 아이템입니다. 타입 정보를 메타데이터에 기록합니다.")
+
+
+    query = "insert into eat values ('{}', '{}', {}, '{}', {}, '{}', NULL)".format(
+        context.args[0],
         context.args[1],
-        context.args[2],
-        datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        int(context.args[3]),
+        "NULL" if context.args[2].lower() == "x" else "'{}'".format(context.args[2]),
+        context.args[3].replace(".", " "),
+        context.args[4],
         comment)
+
 
     try:
         cursor.execute(query)
@@ -232,12 +263,108 @@ def cmd_eat(update, context):
     except:
         db.rollback()    
         context.bot.send_message(chat_id=update.effective_chat.id, 
-                                text="식사 기록을 실패했습니다. 변경 사항을 롤백합니다.")
+                                text="음식 기록을 실패했습니다. 변경 사항을 롤백합니다.")
+        return
 
     context.bot.send_message(chat_id=update.effective_chat.id, 
-                            text="식사 기록이 완료되었습니다.")
+                            text="음식 기록이 완료되었습니다.")
 
-'''
+def cmd_eatmeta(update, context):
+    if check_admin(update, context):
+        return
+
+    if len(context.args) < 1:
+        context.bot.send_message(chat_id=update.effective_chat.id, 
+                                 text="/eatmeta <레벨>\n레벨을 지정하여 카테고리(0), 1차(1), 2차(2)까지 출력합니다.")
+        return
+
+    if context.args[0] not in "012":
+        context.bot.send_message(chat_id=update.effective_chat.id, 
+                                 text="/eatmeta <레벨>\n레벨을 지정하여 카테고리(0), 1차(1), 2차(2)까지 출력합니다.")
+        return
+
+    msg = "[리뷰 정보]\n"
+
+    # first level
+    cursor.execute("select distinct cat from eat_meta")
+    cats = cursor.fetchall()
+    cats_dict = dict()
+    cnt_sum = 0
+
+    for i in cats:
+        cursor.execute("select count(*) from eat where cat = '{}'".format(i[0]))
+        cats_dict[i[0]] = cursor.fetchall()[0][0]
+
+    for key, val in cats_dict.items():
+        cnt_sum += val
+        msg += "[{} 카테고리] ({})\n".format(key, val)
+
+        # second level
+        if context.args[0] in "12":
+            cursor.execute("select distinct type from eat_meta where cat = '{}'".format(key))
+            types = cursor.fetchall()
+            types_dict = dict()
+            cnt_sum_type = 0
+
+            for j in types:
+                cursor.execute("select count(*) from eat where cat = '{}' and type = '{}'".format(key, j[0]))
+                types_dict[j[0]] = cursor.fetchall()[0][0]
+
+            for k1, v1 in types_dict.items():
+                cnt_sum_type += v1
+                msg += "리뷰: {} ({})\n".format(k1, v1)
+
+                # third level
+                if context.args[0] in "2":
+                    cursor.execute("select distinct subtype from eat_meta where cat = '{}' and type = '{}'".format(key, k1))
+                    subtypes = cursor.fetchall()
+                    subtypes_dict = dict()
+                    cnt_sum_subtype = 0
+
+                    for k in subtypes:
+                        cursor.execute("select count(*) from eat where cat = '{}' and type = '{}' and subtype = '{}'".format(key, k1, k[0]))
+                        subtypes_dict[k[0]] = cursor.fetchall()[0][0]
+
+                    for k2, v2 in subtypes_dict.items():
+                        cnt_sum_subtype += v2
+                        if v2 == 0:
+                            continue
+                        msg += "- {} ({})\n".format(k2, v2)
+
+        msg += "\n" if context.args[0] in "12" else ""
+
+    context.bot.send_message(chat_id=update.effective_chat.id, 
+                            text=msg.strip())
+
+def cmd_eatshow(update, context):
+    if check_admin(update, context):
+        return
+
+    if len(context.args) < 2:
+        context.bot.send_message(chat_id=update.effective_chat.id, 
+                                 text="/eatshow <카테고리> <1차 타입> [2차 타입]\n> 해당 조건의 리뷰 목록을 출력합니다. ")
+        return
+
+    q = "select name from eat where cat = '{}' and type = '{}'".format(context.args[0], context.args[1])
+    if len(context.args) == 3:
+        q += " and subtype = '{}'".format(context.args[2])
+
+    q += " order by name"
+
+    cursor.execute(q)
+    result = cursor.fetchall()
+
+    msg = "[리뷰 목록: {}] (총 {}개)\n".format(
+        context.args[1] if len(context.args) == 2 else context.args[2],
+        len(result))
+
+    for i in result:
+        msg += "- {}\n".format(i[0])
+
+
+    context.bot.send_message(chat_id=update.effective_chat.id, 
+                    text=msg.strip())
+  
 
 def cmd_todo(update, context):
     if check_admin(update, context):
@@ -477,7 +604,9 @@ def init():
     bot.add_handler('backup', cmd_backup)
     bot.add_handler('diary', cmd_diary)
     bot.add_handler('todo', cmd_todo)
-    #bot.add_handler('eat', cmd_eat) # NOTE: deprecated
+    bot.add_handler('eat', cmd_eat)
+    bot.add_handler('eatmeta', cmd_eatmeta)
+    bot.add_handler('eatshow', cmd_eatshow)
     bot.add_handler('alarm', cmd_alarm)
 
 
