@@ -216,11 +216,12 @@ def cmd_eat(update, context):
 
     if not context.args[4].isdigit():
         context.bot.send_message(chat_id=update.effective_chat.id, 
-                                text="/eat <카테고리> <1차 타입> <2차 타입> <이름> <점수> <코멘트>\n>\
-                                 먹은 음식을 DB에 기록합니다.\n\
-                                 - 미리 등록된 카테고리 및 1차 타입만 사용 가능합니다.\
-                                 - 2차 타입은 공란일 경우 \"X\"로 표기합니다.\
-                                 - 이름에 띄어쓰기가 필요할 경우 \".\"을 사용합니다.")
+                                text='''\
+/eat <카테고리> <1차 타입> <2차 타입> <이름> <점수> <코멘트>
+> 먹은 음식을 DB에 기록합니다.
+- 미리 등록된 카테고리 및 1차 타입만 사용 가능합니다.
+- 2차 타입은 공란일 경우 \"X\"로 표기합니다.
+- 이름에 띄어쓰기가 필요할 경우 \".\"을 사용합니다.''')
         return
 
 
@@ -240,7 +241,7 @@ def cmd_eat(update, context):
     if context.args[2].lower() == "x":
         pass
     else:
-        cursor.execute("SELECT count(*) FROM eat_meta WHERE subtype = '{}'".format(context.args[2]))
+        cursor.execute("SELECT count(*) FROM eat_meta WHERE cat = '{}' and type = '{}' and subtype = '{}'".format(context.args[0], context.args[1], context.args[2]))
         if cursor.fetchall()[0][0] == 0:
             cursor.execute("INSERT INTO eat_meta VALUES (NULL, '{}', '{}', '{}', NULL)".format(context.args[0], context.args[1], context.args[2]))
             db.commit()
