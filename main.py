@@ -376,7 +376,7 @@ def cmd_todo(update, context):
                                  text="/todo <add|show|remove>\n> TODO 리스트를 등록, 확인, 혹은 제거합니다.")
         return
     
-    if context.args[0] == "add":
+    if context.args[0].lower() == "add":
         if len(context.args) < 2:
             context.bot.send_message(chat_id=update.effective_chat.id, 
                                      text="/todo add <내용>")
@@ -394,7 +394,7 @@ def cmd_todo(update, context):
                                     text="TODO 리스트 등록에 실패했습니다. 변경 사항을 롤백합니다.")  
             return
 
-    elif context.args[0] == "show":
+    elif context.args[0].lower() == "show":
         cursor.execute("select * from todolist")
         items = cursor.fetchall()
 
@@ -411,7 +411,7 @@ def cmd_todo(update, context):
         context.bot.send_message(chat_id=update.effective_chat.id, 
                                 text=msg)
 
-    elif context.args[0] == "remove":
+    elif context.args[0].lower() == "remove":
         if len(context.args) < 2:
             context.bot.send_message(chat_id=update.effective_chat.id, 
                                      text="/todo remove [id]")
@@ -452,7 +452,7 @@ def cmd_alarm(update, context):
                                  text="/alarm <add|show|remove>\n> 알람을 등록, 확인, 혹은 제거합니다.")
         return
     
-    if context.args[0] == "add":
+    if context.args[0].lower() == "add":
         if len(context.args) < 4:
             context.bot.send_message(chat_id=update.effective_chat.id, 
                                      text="/alarm add <이름> <HHMM> <요일|all> [설명]")
@@ -503,7 +503,7 @@ def cmd_alarm(update, context):
         context.bot.send_message(chat_id=update.effective_chat.id, 
                                     text="알람 등록이 완료되었습니다.")                            
         
-    elif context.args[0] == "show":
+    elif context.args[0].lower() == "show":
         items_map = dict()
         
         cursor.execute("select name, hhmm, weekday from alarm")
@@ -541,7 +541,7 @@ def cmd_alarm(update, context):
         context.bot.send_message(chat_id=update.effective_chat.id, 
                                  text=msg)
 
-    elif context.args[0] == "remove":
+    elif context.args[0].lower() == "remove":
         if len(context.args) < 2:
             context.bot.send_message(chat_id=update.effective_chat.id, 
                                      text="/alarm remove <이름>")
