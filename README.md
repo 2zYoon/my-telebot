@@ -9,3 +9,4 @@ The program requires the followings:
   - python-telegram-bot (Tested with 13.8.1)
   - telegram (Tested with 0.0.1)
   - mysqlclient (Tested with 2.1.0)
+  - rpyc (Tested with 5.1.0)
