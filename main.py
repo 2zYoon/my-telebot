@@ -1,14 +1,24 @@
 import yaml
-import telegram
 import datetime
 import threading 
 import os
 import sys
+
+# ZIP archiving
 import shutil
 
+# DB
 import MySQLdb as mysql
 
+# IPC 
+import rpyc
+from rpyc.utils.server import ThreadedServer
+
+# telegram
+import telegram
 from telegram.ext import Updater, CommandHandler
+
+# test for dict
 from pprint import pprint
 
 
@@ -26,6 +36,18 @@ class Telebot:
     def add_handler(self, cmd, func):
         self.updater.dispatcher.add_handler(CommandHandler(cmd, func))
 
+class IPC(rpyc.Service):
+    def __init__(self):
+        self.a = 10
+
+    def exposed_send_msg(self, msg):
+        bot.core.send_message(chat_id=bot.chatid, text=msg)
+
+    def exposed_send_file(self, fname):
+        with open(fname, "rb") as f:
+            bot.core.send_document(chat_id=bot.chatid, 
+                        document=f)
+        
 
 #############
 # CONSTANTS #
@@ -45,7 +67,7 @@ config = dict()
 db = None
 cursor = None
 bot = None
-
+ipc_port = -1
 
 ####################
 # COMMON FUNCTIONS #
@@ -102,6 +124,16 @@ def worker_poll():
     th = threading.Timer(PERIOD_POLL_SEC, worker_poll)
     th.daemon = True
     th.start()
+
+def worker_local_handler(): 
+    if ipc_port == -1:
+        print("[ERROR] IPC: 잘못된 포트입니다.")
+        return
+    
+    bot.core.send_message(chat_id=bot.chatid, text="IPC 핸들러가 준비되었습니다.")
+
+    server = ThreadedServer(IPC, hostname="localhost", port=ipc_port)
+    server.start()
 
 
 ####################
@@ -578,6 +610,7 @@ def init():
     global db
     global cursor
     global bot
+    global ipc_port
 
 
     # get configuration from yaml file 
@@ -592,6 +625,9 @@ def init():
                     db=config['DB']['NAME'],
                     charset="utf8")
     cursor = db.cursor()
+
+    # IPC (rpyc lib)
+    ipc_port = config['IPC']['PORT']
     
 
     # set telegram bot
@@ -614,11 +650,14 @@ def init():
 def main():
     init()
     threading.Thread(target=worker_poll).start()
+    threading.Thread(target=worker_local_handler).start()
 
     bot.core.send_message(chat_id=bot.chatid, text="챗봇이 준비되었습니다.")
     print("[INFO] 챗봇이 준비되었습니다.")
     bot.updater.start_polling()
     bot.updater.idle()
+
+
 
 
     print("[INFO] 프로그램이 종료되었습니다.")
