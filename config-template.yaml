@@ -1,10 +1,12 @@
 TELEBOT:
-  TOKEN:          # e.g., 1234567890:hellohowareyouiamfine
-  ADMIN_CHATID:   # e.g., 1234567890
+  TOKEN:               # e.g., 1234567890:hellohowareyouiamfine
+  ADMIN_CHATID:        # e.g., 1234567890
 DB:
   HOST:                # e.g., localhost
   PORT:                # MySQL default is 3306
   USER:                # Your ID
   PASSWD:              # Your password
   NAME:                # Name of database
+IPC:
+  PORT:                # rpyc port
 

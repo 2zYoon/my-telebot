@@ -21,7 +21,6 @@ from telegram.ext import Updater, CommandHandler
 # test for dict
 from pprint import pprint
 
-
 ###########
 # CLASSES #
 ###########
@@ -88,9 +87,9 @@ def get_now_yymmdd():
 def get_now_hhmm():
     return int(datetime.datetime.now().strftime("%H%M"))
 
-###########################
-# MULTITHREADED FUNCTIONS #
-###########################
+#########################
+# MULTITHREADED WORKERS #
+#########################
 # worker for terminating telegram bot
 def worker_exit():
     global bot 
@@ -135,6 +134,8 @@ def worker_local_handler():
     server = ThreadedServer(IPC, hostname="localhost", port=ipc_port)
     server.start()
 
+def worker_kvstore_server():
+    pass
 
 ####################
 # COMMAND HANDLERS #
@@ -600,6 +601,35 @@ def cmd_alarm(update, context):
         context.bot.send_message(chat_id=update.effective_chat.id, 
                                  text="/alarm <add|show|remove>\n> 알람을 등록, 확인, 혹은 제거합니다.")
 
+# NOTE: the data stored to here is volatile!
+# TODO: get 및 set 구현
+#       어차피 volatile하니 그냥 dict로 구현ㄱㄱ
+def cmd_kv(update, context):
+    if check_admin(update, context):
+        return
+
+    if len(context.args) == 0:
+        context.bot.send_message(chat_id=update.effective_chat.id, 
+                                 text="/kv <get|set|getall|flush> <key>\n> key-value store를 저장/조회/관리합니다.")
+        return
+
+# TODO: DB 위에 구현
+#       날짜, 시간, 이름, 열량 등 기록    
+def cmd_meal(update, context):
+    if check_admin(update, context):
+        return
+
+# TODO: /mealshow [daily|weekly] [before]
+#       전부 생략 시 오늘 먹은 거
+#       daily: n일 전 먹은 거 (before 생략 시 오늘)
+#       weekly: n주 전 먹은 거 (before 생략 시 이번 주)
+#       table을 이미지화 해서 보여주기
+#       mealshow 하지 않더라도 별도로 local에 저장
+def cmd_mealshow(update, context):
+    if check_admin(update, context):
+        return
+
+
 
 ##################
 # MAIN FUNCTIONS #
@@ -657,10 +687,8 @@ def main():
     bot.updater.start_polling()
     bot.updater.idle()
 
-
-
-
     print("[INFO] 프로그램이 종료되었습니다.")
 
 
-main()
+if __name__ == "__main__":
+    main()
