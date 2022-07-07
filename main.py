@@ -68,6 +68,9 @@ cursor = None
 bot = None
 ipc_port = -1
 
+kv_store = dict()
+
+
 ####################
 # COMMON FUNCTIONS #
 ####################
@@ -90,14 +93,14 @@ def get_now_hhmm():
 #########################
 # MULTITHREADED WORKERS #
 #########################
-# worker for terminating telegram bot
+# Worker for terminating telegram bot
 def worker_exit():
     global bot 
 
     bot.updater.stop()
     bot.updater.is_idle = False
 
-# worker for polling
+# Worker for polling
 def worker_poll():
     # alarm
     cursor.execute("select * from alarm where weekday = %d and last != '%s'" % \
@@ -124,6 +127,7 @@ def worker_poll():
     th.daemon = True
     th.start()
 
+# Worker for IPC
 def worker_local_handler(): 
     if ipc_port == -1:
         print("[ERROR] IPC: 잘못된 포트입니다.")
@@ -134,8 +138,10 @@ def worker_local_handler():
     server = ThreadedServer(IPC, hostname="localhost", port=ipc_port)
     server.start()
 
-def worker_kvstore_server():
+# TODO: Worker for external communication
+def worker_extern():
     pass
+
 
 ####################
 # COMMAND HANDLERS #
@@ -171,15 +177,15 @@ def cmd_help(update, context):
 > TODO 리스트를 등록, 확인, 혹은 제거합니다.
 /alarm <add|show|remove>
 > 알람을 등록, 확인, 혹은 제거합니다.
-/eat
+/eat <cat1> <cat2> <cat3> <name> <score> <내용>
 > 음식에 대한 리뷰를 기록합니다.
-/eatmeta
-> 음식 리뷰 관련 정보를 확인합니다.
-/eatshow
-> 특정 음식 리뷰를 출력합니다.
+/kv <get|set|getall|flush> <key> [value]
+> key-value store를 저장/조회/관리합니다.
 '''
+
     context.bot.send_message(chat_id=update.effective_chat.id,
                              text=help_msg)
+
 
 def cmd_backup(update, context):
     if check_admin(update, context):
@@ -604,31 +610,73 @@ def cmd_alarm(update, context):
 # NOTE: the data stored to here is volatile!
 # TODO: get 및 set 구현
 #       어차피 volatile하니 그냥 dict로 구현ㄱㄱ
+#       외부 서버 통해서도 kv 업데이트 가능함... 근데 혼자 쓰므로 sync는 따로 구현 X
 def cmd_kv(update, context):
+    global kv_store
+
     if check_admin(update, context):
         return
 
-    if len(context.args) == 0:
+    if len(context.args) < 1:
         context.bot.send_message(chat_id=update.effective_chat.id, 
-                                 text="/kv <get|set|getall|flush> <key>\n> key-value store를 저장/조회/관리합니다.")
+                                 text="/kv <get|set|getall|flush> [key] [value]\n> key-value store를 저장/조회/관리합니다.")
         return
 
-# TODO: DB 위에 구현
-#       날짜, 시간, 이름, 열량 등 기록    
-def cmd_meal(update, context):
-    if check_admin(update, context):
+    cmd = context.args[0].lower()
+
+    if cmd == "get":
+        if len(context.args) < 2:
+            context.bot.send_message(chat_id=update.effective_chat.id, 
+                                    text="/kv get <key>\n> key에 저장된 값을 불러옵니다.")
+            return
+        
+        key = context.args[1]
+
+        val = kv_store.get(key, None)
+        if val == None:
+            context.bot.send_message(chat_id=update.effective_chat.id, 
+                                    text="key({})에 해당하는 값이 없습니다.".format(key))
+        else:
+            context.bot.send_message(chat_id=update.effective_chat.id, 
+                                    text="{}: {}".format(key, val))
+        return
+    
+    elif cmd == "set":
+        if len(context.args) < 3:
+            context.bot.send_message(chat_id=update.effective_chat.id, 
+                                    text="/kv set <key> <value>\n> key에 value를 저장합니다.")
+            return
+
+        key = context.args[1]
+
+        kv_store[key] = " ".join(context.args[2:])
+        context.bot.send_message(chat_id=update.effective_chat.id, 
+                        text="key-value set이 완료되었습니다.\n> {}: {}".format(key, kv_store[key]))
         return
 
-# TODO: /mealshow [daily|weekly] [before]
-#       전부 생략 시 오늘 먹은 거
-#       daily: n일 전 먹은 거 (before 생략 시 오늘)
-#       weekly: n주 전 먹은 거 (before 생략 시 이번 주)
-#       table을 이미지화 해서 보여주기
-#       mealshow 하지 않더라도 별도로 local에 저장
-def cmd_mealshow(update, context):
-    if check_admin(update, context):
+    elif cmd == "getall":
+        msg = ""
+        for i in kv_store.items():
+            msg += "{}: {}\n".format(i[0], i[1])
+
+        if msg == "":
+            context.bot.send_message(chat_id=update.effective_chat.id, 
+                                    text="저장된 데이터가 없습니다.")
+        else:
+            context.bot.send_message(chat_id=update.effective_chat.id, 
+                                    text="저장된 key-value: {}개\n{}".format(len(kv_store.items()), msg.strip()))
         return
 
+    elif cmd == "flush":
+        kv_store = dict()
+        context.bot.send_message(chat_id=update.effective_chat.id, 
+                                text="모든 key-value를 제거하였습니다.")
+        return
+
+    else:
+        context.bot.send_message(chat_id=update.effective_chat.id, 
+                                 text="/kv <get|set|getall|flush> <key> [value]\n> key-value store를 저장/조회/관리합니다.")
+        return
 
 
 ##################
@@ -672,9 +720,10 @@ def init():
     bot.add_handler('diary', cmd_diary)
     bot.add_handler('todo', cmd_todo)
     bot.add_handler('eat', cmd_eat)
-    bot.add_handler('eatmeta', cmd_eatmeta)
-    bot.add_handler('eatshow', cmd_eatshow)
+    #bot.add_handler('eatmeta', cmd_eatmeta)
+    #bot.add_handler('eatshow', cmd_eatshow)
     bot.add_handler('alarm', cmd_alarm)
+    bot.add_handler('kv', cmd_kv)
 
 
 def main():
